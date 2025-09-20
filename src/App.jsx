@@ -80,6 +80,114 @@ export default function App() {
     );
 }
 
+// --- AuthScreen, Dashboard, ResumeDoctor, OpportunityInbox... (These components remain unchanged) ---
+// ... (AuthScreen code is unchanged)
+// ... (Dashboard code is unchanged)
+// ... (ResumeDoctor code is unchanged)
+// ... (OpportunityInbox code is unchanged)
+
+// --- DELETED ---
+// The callGeminiAPI function is no longer needed in the frontend.
+// The backend will handle all Gemini calls.
+
+// --- MODIFIED: ResumeUploader Component ---
+function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
+    const fileInputRef = useRef(null);
+    const BACKEND_URL = "http://127.0.0.1:8000/analyze_resume/";
+
+    const handleFileChange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            // We support both PDF and DOCX now, as the backend handles them
+            if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
+                analyzeResumeWithBackend(file);
+            } else {
+                alert("Please upload a PDF or DOCX file.");
+            }
+        }
+    };
+
+    const analyzeResumeWithBackend = async (file) => {
+        setLoading(true);
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+            const response = await fetch(BACKEND_URL, {
+                method: 'POST',
+                body: formData,
+                // NOTE: Do NOT set 'Content-Type' header for FormData.
+                // The browser will set it automatically with the correct boundary.
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            // --- Adapt backend response to frontend's expected format ---
+            const analysisResult = {
+                atsScore: result.Report?.['ATS Score (%)'] || 0,
+                suggestions: result.LLM_Output?.bullets || ["No suggestions available."],
+                rewrittenSummary: result.LLM_Output?.improved_snippet || "Could not generate a summary."
+            };
+            
+            // For now, we are not generating opportunities. 
+            // This could be a future step to add to the backend.
+            const opportunitiesResult = []; 
+
+            // Save results to Firestore (optional, if you want to keep this)
+            const userId = user.uid;
+            const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'userData');
+            await setDoc(userDocRef, {
+                resumeAnalysis: analysisResult,
+                opportunities: opportunitiesResult,
+            }, { merge: true });
+
+            onAnalysisComplete(analysisResult, opportunitiesResult);
+
+        } catch (error) {
+            console.error("Failed to analyze resume with backend:", error);
+            alert(`An error occurred: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleButtonClick = () => {
+        fileInputRef.current.click();
+    };
+
+    return (
+        <div className="bg-white p-8 rounded-2xl shadow-lg border-2 border-dashed border-gray-300 text-center">
+            <div className="flex justify-center mb-4">
+                <UploadIcon />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800">Upload Your Resume</h2>
+            <p className="text-gray-500 mt-2">Upload your resume in PDF or DOCX format.</p>
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept=".pdf,.docx"
+                disabled={isLoading}
+            />
+            <button
+                onClick={handleButtonClick}
+                disabled={isLoading}
+                className="mt-6 px-8 py-3 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 transition-all duration-300"
+            >
+                {isLoading ? 'Analyzing...' : 'Choose File'}
+            </button>
+        </div>
+    );
+}
+
+
 // --- Authentication Screen ---
 function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);
@@ -290,7 +398,7 @@ function Dashboard({ user }) {
 }
 
 // --- API Call to Gemini ---
-async function callGeminiAPI(payload) {
+/*async function callGeminiAPI(payload) {
     // In a real app, the API key would be handled on a backend.
     // For this prototype, we'll assume it's available securely.
     const apiKey = ""; // Canvas will provide this
@@ -324,11 +432,11 @@ async function callGeminiAPI(payload) {
             await new Promise(res => setTimeout(res, 2000)); // Wait 2s before retrying
         }
     }
-}
+}*/
 
 
 // --- Resume Uploader and Analyzer ---
-function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
+/*function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
     const fileInputRef = useRef(null);
 
     const handleFileChange = async (event) => {
@@ -470,7 +578,7 @@ ${resumeText}
             </button>
         </div>
     );
-}
+}*/
 
 
 // --- Resume Doctor View ---
