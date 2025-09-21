@@ -38,7 +38,7 @@ app.add_middleware(
 # +++++++++++++++++++++++++++++++++++++++++
 
 # ---------- Config ----------
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", None)    # or set directly (not recommended)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")    # or set directly (not recommended)
 JD_CSV_PATH = r"jd/UpdatedResumeDataSet.csv"
 
 # ------------------------
@@ -129,7 +129,7 @@ except Exception as e:
 # LLM integration: helper wrappers
 # ------------------------
 def build_gemini_prompt(resume_text: str, jd_text: str, missing_keywords: list) -> str:
-    prompt = f"""
+    '''prompt = f"""
 You are a professional resume coach. Given the candidate resume (DELIMITED BY <<<RESUME>>>)
 and the target job description (DELIMITED BY <<<JD>>>), do the following:
 1) Produce 6 concise, ATS-optimized resume bullets that better describe the candidate's strongest relevant work for this JD.
@@ -145,6 +145,28 @@ If any information isn't present in the resume, infer plausible but conservative
 {jd_text}
 <<<MISSING_KEYWORDS>>>
 {', '.join(missing_keywords)}
+"""'''
+    # --- MODIFIED AND IMPROVED PROMPT ---
+    prompt = f"""
+You are an expert resume coach reviewing a resume for a specific job description.
+Your task is to provide feedback in a structured JSON format.
+
+**Instructions:**
+1.  **rewrittenSummary**: Write a concise, professional summary (2-4 sentences) for the resume. This summary should be impactful and tailored to the job description.
+2.  **bullets**: Generate exactly 6 specific, ATS-optimized bullet points. Each bullet should highlight a key achievement or skill relevant to the job. Use action verbs and quantify results where possible. These bullets will be the main "Improvement Suggestions".
+
+**Input:**
+
+<<<RESUME>>>
+{resume_text}
+<<<RESUME>>>
+
+<<<JD>>>
+{jd_text}
+<<<JD>>>
+
+**Output Format (JSON only):**
+Return a single, clean JSON object with the keys "rewrittenSummary" (string) and "bullets" (list of strings). Do not include any other text or markdown formatting.
 """
     return prompt
 

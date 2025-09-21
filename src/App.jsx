@@ -339,10 +339,18 @@ function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
             console.log("Backend Response:", result);
             // -------------------------------------------
 
-            const analysisResult = {
+            /*const analysisResult = {
                 atsScore: result.Report?.['ATS Score (%)'] || 0,
                 suggestions: result.LLM_Output?.bullets || result.Report?.["Suggested Additions"] || ["No suggestions available."],
                 rewrittenSummary: result.LLM_Output?.improved_snippet || "Could not generate a summary."
+            };*/
+
+            const analysisResult = {
+                atsScore: result.Report?.['ATS Score (%)'] || 0,
+                // Use the 'bullets' from the AI for suggestions
+                suggestions: result.LLM_Output?.bullets || result.Report?.["Suggested Additions"] || [],
+                // Use the 'rewrittenSummary' from the AI
+                rewrittenSummary: result.LLM_Output?.rewrittenSummary || "Could not generate a summary."
             };
             
             // This could be expanded in the backend later
