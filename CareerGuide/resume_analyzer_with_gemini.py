@@ -35,9 +35,8 @@ app.add_middleware(
 # +++++++++++++++++++++++++++++++++++++++++
 
 # ---------- Config ----------
-USE_GOOGLE_GEMINI = True  # set False to use OpenAI-compatible path (if you have that setup)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", None)    # or set directly (not recommended)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", None)    # for OpenAI-compatible usage
+JD_CSV_PATH = r"jd/UpdatedResumeDataSet.csv"
 
 # ------------------------
 # Helper functions
@@ -112,7 +111,6 @@ def extract_text_from_file(file: UploadFile):
 # Load JD dataset (example)
 # ------------------------
 # Make sure this path is valid on your server. Replace with your CSV path.
-JD_CSV_PATH = r"jd/UpdatedResumeDataSet.csv"
 try:
     jd_dataset = pd.read_csv(JD_CSV_PATH)
     if "job_description" not in jd_dataset.columns:
@@ -147,7 +145,7 @@ If any information isn't present in the resume, infer plausible but conservative
 """
     return prompt
 
-# Option A: Google Gemini (google-generativeai)
+# Google Gemini (google-generativeai)
 def call_gemini_google(prompt: str) -> Dict[str, Any]:
     try:
         import google.generativeai as genai
@@ -158,15 +156,23 @@ def call_gemini_google(prompt: str) -> Dict[str, Any]:
     genai.configure(api_key=GOOGLE_API_KEY)
 
     # Choose a model available to you, e.g. gemini-1.5-pro-latest or gemini-1.5-flash-latest
-    model = "models/gemini-1.5-pro-latest"
+    # model = "models/gemini-1.5-pro-latest"
+
+    # Use the modern GenerativeModel API
+    model = genai.GenerativeModel("gemini-1.5-flash-latest") # Using flash for speed
+
     # generate a structured text response
-    response = genai.generate(
+    '''response = genai.generate(
         model=model,
         prompt=prompt,
         max_output_tokens=800
-    )
+    )'''
+
+    # Generate content using the new method
+    response = model.generate_content(prompt)
+
     # the library may put content in response.candidates[0].output or response.text
-    content = ""
+    '''content = ""
     if hasattr(response, "candidates") and len(response.candidates) > 0:
         content = response.candidates[0].output
     elif hasattr(response, "text"):
@@ -178,31 +184,22 @@ def call_gemini_google(prompt: str) -> Dict[str, Any]:
         parsed = json.loads(content)
     except Exception:
         parsed = {"raw": content}
-    return parsed
+    return parsed'''
 
-# Option B: OpenAI-compatible client (if you use OpenAI library pointing to Gemini model)
-def call_gemini_openai(prompt: str) -> Dict[str, Any]:
+    content = response.text
+
+    # --- ADDED CLEANUP LOGIC ---
+    # Clean the response to remove markdown formatting before parsing
+    if content.strip().startswith("```json"):
+        content = re.sub(r'```json\s*|\s*```', '', content).strip()
+    # --- END OF CLEANUP LOGIC ---
+
     try:
-        from openai import OpenAI
-    except Exception as e:
-        raise RuntimeError("openai library not installed. pip install openai") from e
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY not set in env")
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    # Example using chat completions (syntax depends on OpenAI SDK version)
-    model = "gpt-4o-mini"  # replace with the model you plan to use or gemini-compatible model name if available
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role":"system","content":"You are a professional resume coach."},
-                  {"role":"user","content":prompt}],
-        max_tokens=800,
-        temperature=0.2
-    )
-    # extract text
-    content = resp.choices[0].message.content
-    try:
+        # The model should return a clean JSON string as requested in the prompt
         parsed = json.loads(content)
-    except Exception:
+    except (json.JSONDecodeError, TypeError):
+        # If it fails to parse, return the raw text for debugging
+        print(f"Gemini response was not valid JSON: {content}")
         parsed = {"raw": content}
     return parsed
 
@@ -244,10 +241,7 @@ async def analyze_resume(file: UploadFile = File(...)):
 
     # Call the LLM
     try:
-        if USE_GOOGLE_GEMINI:
-            llm_output = call_gemini_google(prompt)
-        else:
-            llm_output = call_gemini_openai(prompt)
+        llm_output = call_gemini_google(prompt)
     except Exception as e:
         # return the basic info and error about LLM call so the frontend can still show ATS results
         return {

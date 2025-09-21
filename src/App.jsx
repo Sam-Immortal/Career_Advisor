@@ -55,11 +55,7 @@ export default function App() {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-            } else {
-                setUser(null);
-            }
+            setUser(currentUser);
             setLoadingAuth(false);
         });
         return () => unsubscribe();
@@ -79,114 +75,6 @@ export default function App() {
         </div>
     );
 }
-
-// --- AuthScreen, Dashboard, ResumeDoctor, OpportunityInbox... (These components remain unchanged) ---
-// ... (AuthScreen code is unchanged)
-// ... (Dashboard code is unchanged)
-// ... (ResumeDoctor code is unchanged)
-// ... (OpportunityInbox code is unchanged)
-
-// --- DELETED ---
-// The callGeminiAPI function is no longer needed in the frontend.
-// The backend will handle all Gemini calls.
-
-// --- MODIFIED: ResumeUploader Component ---
-function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
-    const fileInputRef = useRef(null);
-    const BACKEND_URL = "http://127.0.0.1:8000/analyze_resume/";
-
-    const handleFileChange = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            // We support both PDF and DOCX now, as the backend handles them
-            if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
-                analyzeResumeWithBackend(file);
-            } else {
-                alert("Please upload a PDF or DOCX file.");
-            }
-        }
-    };
-
-    const analyzeResumeWithBackend = async (file) => {
-        setLoading(true);
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        try {
-            const response = await fetch(BACKEND_URL, {
-                method: 'POST',
-                body: formData,
-                // NOTE: Do NOT set 'Content-Type' header for FormData.
-                // The browser will set it automatically with the correct boundary.
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `Server error: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            // --- Adapt backend response to frontend's expected format ---
-            const analysisResult = {
-                atsScore: result.Report?.['ATS Score (%)'] || 0,
-                suggestions: result.LLM_Output?.bullets || ["No suggestions available."],
-                rewrittenSummary: result.LLM_Output?.improved_snippet || "Could not generate a summary."
-            };
-            
-            // For now, we are not generating opportunities. 
-            // This could be a future step to add to the backend.
-            const opportunitiesResult = []; 
-
-            // Save results to Firestore (optional, if you want to keep this)
-            const userId = user.uid;
-            const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'userData');
-            await setDoc(userDocRef, {
-                resumeAnalysis: analysisResult,
-                opportunities: opportunitiesResult,
-            }, { merge: true });
-
-            onAnalysisComplete(analysisResult, opportunitiesResult);
-
-        } catch (error) {
-            console.error("Failed to analyze resume with backend:", error);
-            alert(`An error occurred: ${error.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleButtonClick = () => {
-        fileInputRef.current.click();
-    };
-
-    return (
-        <div className="bg-white p-8 rounded-2xl shadow-lg border-2 border-dashed border-gray-300 text-center">
-            <div className="flex justify-center mb-4">
-                <UploadIcon />
-            </div>
-            <h2 className="text-xl font-semibold text-gray-800">Upload Your Resume</h2>
-            <p className="text-gray-500 mt-2">Upload your resume in PDF or DOCX format.</p>
-            <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept=".pdf,.docx"
-                disabled={isLoading}
-            />
-            <button
-                onClick={handleButtonClick}
-                disabled={isLoading}
-                className="mt-6 px-8 py-3 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 transition-all duration-300"
-            >
-                {isLoading ? 'Analyzing...' : 'Choose File'}
-            </button>
-        </div>
-    );
-}
-
 
 // --- Authentication Screen ---
 function AuthScreen() {
@@ -208,7 +96,6 @@ function AuthScreen() {
             } else {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
-                // Store user's full name in Firestore
                 const userId = user.uid;
                 const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'userData');
                 await setDoc(userDocRef, {
@@ -311,12 +198,13 @@ function Dashboard({ user }) {
             const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'userData');
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists()) {
-                setProfile(docSnap.data());
-                if (docSnap.data().resumeAnalysis) {
-                    setResumeData(docSnap.data().resumeAnalysis);
+                const data = docSnap.data();
+                setProfile(data);
+                if (data.resumeAnalysis) {
+                    setResumeData(data.resumeAnalysis);
                 }
-                if (docSnap.data().opportunities) {
-                    setOpportunities(docSnap.data().opportunities);
+                if (data.opportunities) {
+                    setOpportunities(data.opportunities);
                 }
             }
         };
@@ -361,6 +249,21 @@ function Dashboard({ user }) {
                     <p className="text-gray-600 mt-1">Let's shape your future. Start by getting feedback on your resume to unlock personalized opportunities.</p>
                 </div>
 
+                {/* --- MODIFIED LOGIC TO ALLOW RE-UPLOAD --- */}
+                {resumeData && !loading && (
+                    <div className="mb-6 text-right">
+                        <button
+                            onClick={() => {
+                                setResumeData(null);
+                                setOpportunities(null); // Also clear opportunities
+                            }}
+                            className="px-6 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300"
+                        >
+                            Analyze New Resume
+                        </button>
+                    </div>
+                )}
+
                 {!resumeData && <ResumeUploader onAnalysisComplete={handleAnalysisComplete} user={user} setLoading={setLoading} isLoading={loading} />}
 
                 {loading && (
@@ -397,154 +300,65 @@ function Dashboard({ user }) {
     );
 }
 
-// --- API Call to Gemini ---
-/*async function callGeminiAPI(payload) {
-    // In a real app, the API key would be handled on a backend.
-    // For this prototype, we'll assume it's available securely.
-    const apiKey = ""; // Canvas will provide this
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+// --- Resume Uploader and Analyzer ---
+function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
+    const fileInputRef = useRef(null);
+    const BACKEND_URL = "http://127.0.0.1:8000/analyze_resume/";
 
-    let retries = 3;
-    while (retries > 0) {
+    const handleFileChange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
+                analyzeResumeWithBackend(file);
+            } else {
+                alert("Please upload a PDF or DOCX file.");
+            }
+        }
+    };
+
+    const analyzeResumeWithBackend = async (file) => {
+        setLoading(true);
+        const formData = new FormData();
+        formData.append("file", file);
+
         try {
-            const response = await fetch(apiUrl, {
+            const response = await fetch(BACKEND_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: formData,
             });
 
             if (!response.ok) {
-                throw new Error(`API call failed with status: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Server error: ${response.status}`);
             }
 
             const result = await response.json();
-            const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) {
-                return JSON.parse(text);
-            } else {
-                console.error("Invalid response structure from Gemini:", result);
-                throw new Error("Failed to parse Gemini response.");
-            }
-        } catch (error) {
-            console.error(`API call failed: ${error.message}. Retrying...`);
-            retries--;
-            if (retries === 0) throw error;
-            await new Promise(res => setTimeout(res, 2000)); // Wait 2s before retrying
-        }
-    }
-}*/
 
+            // --- ADD THIS LINE TO CHECK THE RESPONSE ---
+            console.log("Backend Response:", result);
+            // -------------------------------------------
 
-// --- Resume Uploader and Analyzer ---
-/*function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
-    const fileInputRef = useRef(null);
-
-    const handleFileChange = async (event) => {
-        const file = event.target.files[0];
-        if (file && file.type === 'application/pdf') {
-            setLoading(true);
-            try {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    const resumeText = await extractTextFromPDF(e.target.result);
-                    await analyzeResume(resumeText);
-                };
-                reader.readAsArrayBuffer(file);
-            } catch (error) {
-                console.error("Error processing file:", error);
-                alert("Failed to process PDF. Please try another file.");
-                setLoading(false);
-            }
-        } else {
-            alert("Please upload a PDF file.");
-        }
-    };
-    
-    // Simplified PDF text extraction (requires pdf.js library in a real project)
-    // For this prototype, we'll simulate text extraction.
-    const extractTextFromPDF = async (arrayBuffer) => {
-         // This is a placeholder. In a real project, you would use a library like PDF.js
-         // For demonstration, we'll just treat the input as text if it's not a real PDF.
-         // A more robust implementation is needed for production.
-         console.log("Simulating PDF text extraction. For a real app, integrate PDF.js.");
-         // Let's create a sample resume text for the demo to work without a real PDF parser.
-        return "Priya Sharma\nBengaluru, India\n\nEducation: B.Tech in Computer Science, IIT Delhi, 2023.\n\nSkills: Python, JavaScript, React, Node.js, Machine Learning.\n\nProjects: Built a movie recommendation engine using Python.";
-    };
-
-    const analyzeResume = async (resumeText) => {
-        try {
-            // Step 1: Analyze the resume
-            const resumePayload = {
-                contents: [{
-                    parts: [{
-                        text: `You are an expert career coach for Indian students. Analyze the following resume text. Provide an ATS-friendly score out of 100, concrete suggestions for improvement, and a professionally rewritten version of the resume summary/objective. Focus on action verbs and quantifiable achievements.
-
-Resume Text:
----
-${resumeText}
----`
-                    }]
-                }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            atsScore: { type: "NUMBER" },
-                            suggestions: { type: "ARRAY", items: { type: "STRING" } },
-                            rewrittenSummary: { type: "STRING" }
-                        },
-                        required: ["atsScore", "suggestions", "rewrittenSummary"]
-                    }
-                }
+            const analysisResult = {
+                atsScore: result.Report?.['ATS Score (%)'] || 0,
+                suggestions: result.LLM_Output?.bullets || result.Report?.["Suggested Additions"] || ["No suggestions available."],
+                rewrittenSummary: result.LLM_Output?.improved_snippet || "Could not generate a summary."
             };
-            const analysisResult = await callGeminiAPI(resumePayload);
-
-            // Step 2: Get opportunities based on the resume
-            const opportunitiesPayload = {
-                contents: [{
-                    parts: [{
-                        text: `Based on the skills and experience in the following resume, find 5 relevant opportunities for an Indian student. Include a mix of job postings, internships, relevant online courses (from platforms like Coursera or Udemy), and upcoming hackathons in India.
-
-Resume Text:
----
-${resumeText}
----`
-                    }]
-                }],
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "ARRAY",
-                        items: {
-                            type: "OBJECT",
-                            properties: {
-                                title: { type: "STRING" },
-                                type: { type: "STRING", enum: ["Job", "Internship", "Course", "Hackathon"] },
-                                description: { type: "STRING" },
-                                link: { type: "STRING" }
-                            },
-                            required: ["title", "type", "description", "link"]
-                        }
-                    }
-                }
-            };
-            const opportunitiesResult = await callGeminiAPI(opportunitiesPayload);
             
-            // Step 3: Save results to Firestore
+            // This could be expanded in the backend later
+            const opportunitiesResult = result.LLM_Output?.opportunities || []; 
+
             const userId = user.uid;
             const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'userData');
             await setDoc(userDocRef, {
                 resumeAnalysis: analysisResult,
                 opportunities: opportunitiesResult,
-                originalResume: resumeText
             }, { merge: true });
 
             onAnalysisComplete(analysisResult, opportunitiesResult);
 
         } catch (error) {
-            console.error("Failed to analyze resume with Gemini:", error);
-            alert("Our AI assistant is currently busy. Please try again later.");
+            console.error("Failed to analyze resume with backend:", error);
+            alert(`An error occurred: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -560,13 +374,13 @@ ${resumeText}
                 <UploadIcon />
             </div>
             <h2 className="text-xl font-semibold text-gray-800">Upload Your Resume</h2>
-            <p className="text-gray-500 mt-2">Upload your resume in PDF format to get started.</p>
+            <p className="text-gray-500 mt-2">Upload your resume in PDF or DOCX format.</p>
             <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
                 className="hidden"
-                accept=".pdf"
+                accept=".pdf,.docx"
                 disabled={isLoading}
             />
             <button
@@ -574,11 +388,11 @@ ${resumeText}
                 disabled={isLoading}
                 className="mt-6 px-8 py-3 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 transition-all duration-300"
             >
-                {isLoading ? 'Processing...' : 'Choose File'}
+                {isLoading ? 'Analyzing...' : 'Choose File'}
             </button>
         </div>
     );
-}*/
+}
 
 
 // --- Resume Doctor View ---
@@ -603,7 +417,7 @@ function ResumeDoctor({ analysis }) {
                     </div>
                 </div>
                 <div className="md:col-span-2 bg-indigo-50 p-6 rounded-2xl">
-                     <h3 className="text-lg font-semibold text-gray-800 flex items-center mb-3">
+                   <h3 className="text-lg font-semibold text-gray-800 flex items-center mb-3">
                         <LightbulbIcon />
                         <span className="ml-2">Rewritten Summary</span>
                     </h3>
@@ -686,4 +500,5 @@ function OpportunityInbox({ opportunities }) {
         </div>
     );
 }
+
 
