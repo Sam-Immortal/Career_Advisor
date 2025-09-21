@@ -30,14 +30,15 @@ import { getAnalytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Replace the old firebaseConfig object with this:
 const firebaseConfig = {
-  apiKey: "AIzaSyCC2BHg4eSGoUke7Mt8HBpjEgFn52NU4WA",
-  authDomain: "career-advisor-f9cb0.firebaseapp.com",
-  projectId: "career-advisor-f9cb0",
-  storageBucket: "career-advisor-f9cb0.firebasestorage.app",
-  messagingSenderId: "513335747174",
-  appId: "1:513335747174:web:69703233764a8da63ec3a7",
-  measurementId: "G-2SXJ9M3NBY"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
@@ -500,5 +501,3 @@ function OpportunityInbox({ opportunities }) {
         </div>
     );
 }
-
-

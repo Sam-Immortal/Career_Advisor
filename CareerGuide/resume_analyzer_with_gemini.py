@@ -16,6 +16,9 @@ import os
 import json
 from typing import Dict, Any
 
+from dotenv import load_dotenv
+load_dotenv()
+
 app = FastAPI(title="Resume Analyzer + Gemini Suggestions")
 
 # This allows your React app (running on localhost:3000) to communicate with the backend
