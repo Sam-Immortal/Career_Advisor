@@ -304,7 +304,7 @@ function Dashboard({ user }) {
 // --- Resume Uploader and Analyzer ---
 function ResumeUploader({ onAnalysisComplete, user, setLoading, isLoading }) {
     const fileInputRef = useRef(null);
-    const BACKEND_URL = "http://127.0.0.1:8000/analyze_resume/";
+    const BACKEND_URL = "https://67f446f9-285e-4920-9d2c-6b1587c1dbb1-00-1ld3ivy6pb0b6.spock.replit.dev:8000/analyze_resume/";
 
     const handleFileChange = (event) => {
         const file = event.target.files[0];

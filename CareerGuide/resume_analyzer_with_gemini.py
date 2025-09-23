@@ -21,10 +21,12 @@ load_dotenv()
 
 app = FastAPI(title="Resume Analyzer + Gemini Suggestions")
 
-# This allows your React app (running on localhost:3000) to communicate with the backend
+# This allows your React app to communicate with the backend
 origins = [
+    "http://localhost:5000",
+    "https://67f446f9-285e-4920-9d2c-6b1587c1dbb1-00-1ld3ivy6pb0b6.spock.replit.dev",  # Replit domain
     "http://localhost:3000",
-    "http://localhost:3001",
+    "http://localhost:3001", 
     "http://localhost:5173", # Common for Vite React apps
 ]
 
