@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pandas
+python-docx
+PyMuPDF
+scikit-learn
+google-generativeai
+python-dotenv
